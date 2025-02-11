@@ -6,6 +6,8 @@ import tensorflow as tf
 import tensorflow_datasets as tfds
 import tensorflow_hub as hub
 
+from orca_gym.robomimic.dataset_util import DatasetReader, DatasetWriter
+
 
 class OrcaGymDataset(tfds.core.GeneratorBasedBuilder):
     """DatasetBuilder for example dataset."""
@@ -26,29 +28,29 @@ class OrcaGymDataset(tfds.core.GeneratorBasedBuilder):
                 'steps': tfds.features.Dataset({
                     'observation': tfds.features.FeaturesDict({
                         'image': tfds.features.Image(
-                            shape=(64, 64, 3),
+                            shape=(256, 256, 3),
                             dtype=np.uint8,
                             encoding_format='png',
                             doc='Main camera RGB observation.',
                         ),
-                        'wrist_image': tfds.features.Image(
-                            shape=(64, 64, 3),
-                            dtype=np.uint8,
-                            encoding_format='png',
-                            doc='Wrist camera RGB observation.',
-                        ),
+                        # 'wrist_image': tfds.features.Image(
+                        #     shape=(64, 64, 3),
+                        #     dtype=np.uint8,
+                        #     encoding_format='png',
+                        #     doc='Wrist camera RGB observation.',
+                        # ),
                         'state': tfds.features.Tensor(
-                            shape=(10,),
+                            shape=(31,),
                             dtype=np.float32,
-                            doc='Robot state, consists of [7x robot joint angles, '
-                                '2x gripper position, 1x door opening angle].',
+                            doc='Robot & object state, consists of '
+                                'qpos[7x robot joint angles, 2x gripper position, 7x object position] +'
+                                'qvel[7x robot joint angle speed, 2x gripper speed, 6x object speed].',
                         )
                     }),
                     'action': tfds.features.Tensor(
-                        shape=(10,),
+                        shape=(8,),
                         dtype=np.float32,
-                        doc='Robot action, consists of [7x joint velocities, '
-                            '2x gripper velocities, 1x terminate episode].',
+                        doc='Robot action, consists of [6x 6dof end-effector positon, 2x gripper postion].'
                     ),
                     'discount': tfds.features.Scalar(
                         dtype=np.float32,
@@ -56,7 +58,9 @@ class OrcaGymDataset(tfds.core.GeneratorBasedBuilder):
                     ),
                     'reward': tfds.features.Scalar(
                         dtype=np.float32,
-                        doc='Reward if provided, 1 on final step for demos.'
+                        doc='Reward if provided, '
+                            'For sparse reward, 1 for success, 0 otherwise.'
+                            'For dense reward, see the reward function in the environment.'
                     ),
                     'is_first': tfds.features.Scalar(
                         dtype=np.bool_,
@@ -68,7 +72,7 @@ class OrcaGymDataset(tfds.core.GeneratorBasedBuilder):
                     ),
                     'is_terminal': tfds.features.Scalar(
                         dtype=np.bool_,
-                        doc='True on last step of the episode if it is a terminal step, True for demos.'
+                        doc='True on last step of the episode if it is a terminal step, False if it is a tuncated episode.'
                     ),
                     'language_instruction': tfds.features.Text(
                         doc='Language Instruction.'
@@ -90,16 +94,17 @@ class OrcaGymDataset(tfds.core.GeneratorBasedBuilder):
     def _split_generators(self, dl_manager: tfds.download.DownloadManager):
         """Define data splits."""
         return {
-            'train': self._generate_examples(path='data/train/episode_*.npy'),
-            'val': self._generate_examples(path='data/val/episode_*.npy'),
+            'train': self._generate_examples(path='data/*.hdf5', split='train'),
+            'val': self._generate_examples(path='data/*.hdf5', split='val'),
         }
 
-    def _generate_examples(self, path) -> Iterator[Tuple[str, Any]]:
+    def _generate_examples(self, path : str, split : str) -> Iterator[Tuple[str, Any]]:
         """Generator of examples for each split."""
 
         def _parse_example(episode_path):
             # load raw data --> this should change for your dataset
-            data = np.load(episode_path, allow_pickle=True)     # this is a list of dicts in our case
+            # data = np.load(episode_path, allow_pickle=True)     # this is a list of dicts in our case
+            reader = DatasetReader(episode_path)
 
             # assemble episode --> here we're assuming demos so we set reward to 1 at the end
             episode = []
