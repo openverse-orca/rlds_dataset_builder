@@ -118,13 +118,16 @@ class OrcaGymDataset(tfds.core.GeneratorBasedBuilder):
 
                 demo_len = len(demo_data['actions'])
                 for i in range(demo_len):
+                    action = demo_data['actions'][i]
+                    action[6] = np.clip(action[6], -1.0, 1.0)  # clip gripper action to [-1, 1]
+                    action[7] = np.clip(action[7], 0.0, 1.0)  # clip door open to [0, 1]
                     episode.append({
                         'observation': {
                             'image': demo_data['camera_frames']['camera_primary'][i],
                             # 'wrist_image': step['wrist_image'],
                             'state': demo_data['states'][i],
                         },
-                        'action': demo_data['actions'][i],
+                        'action': action,
                         'discount': 1.0,
                         'reward': demo_data['rewards'][i], #float(i == (len(demo_data) - 1)),
                         'is_first': i == 0,
