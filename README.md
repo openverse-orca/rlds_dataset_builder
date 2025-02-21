@@ -6,6 +6,14 @@ modify the example code for your dataset following the steps below.
 
 ## Installation
 
+## 本地安装方法
+1. 首先安装OrcaGym环境
+2. 安装下面的包：
+```bash
+pip install tensorflow tensorflow_datasets tensorflow_hub apache_beam matplotlib plotly wandb mlcroissant
+```
+3. 下面的安装步骤可以跳过
+
 First create a conda environment using the provided environment.yml file (use `environment_ubuntu.yml` or `environment_macos.yml` depending on the operating system you're using):
 ```
 conda env create -f environment_ubuntu.yml
